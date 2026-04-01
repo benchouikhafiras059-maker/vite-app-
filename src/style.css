@@ -1,0 +1,13 @@
+/* Hero Faction Screen — styles
+   Design Intent will define all values here. */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  font-family: sans-serif;
+}
