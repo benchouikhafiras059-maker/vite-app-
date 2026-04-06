@@ -8,6 +8,46 @@ Project by Firas Benchouikha
 
 ---
 
+## System Flow
+
+```mermaid
+flowchart TD
+    A([Page Load]) --> B
+
+    subgraph INPUT
+        B[Browser requests app]
+        U1[User hovers a panel]
+        U2[User clicks SELECT ARCHETYPE]
+        U3[User clicks CHANGE SELECTION\nor presses Escape]
+    end
+
+    subgraph PROCESSING
+        B --> C[Vite serves index.html + main.js + style.css]
+        C --> D[JS renders 4 faction panels from FACTIONS data]
+        D --> E[CSS intro animation sequence runs\nPanels reveal left → right with 200ms stagger]
+        E --> F[Shine sweep fires at 1350ms]
+        F --> G[Idle state — 4 equal columns]
+
+        U1 --> H[grid.dataset.active = faction id\nis-active / is-inactive classes applied]
+        H --> I[CSS grid-template-columns transitions\nActive panel expands to ~60%]
+        I --> J[animateStats — stat bars fill\ncountUp runs on each value]
+
+        U2 --> K[FACTIONS data looked up by id\nConfirm overlay populated with name + role]
+        K --> L[Entrance animation replayed via reflow trick]
+
+        U3 --> M[Overlay hidden\nis-visible class removed]
+    end
+
+    subgraph OUTPUT
+        G --> N[4 vertical panels — equal width\nVertical labels visible]
+        J --> O[Active panel expanded\nPlayer image revealed\nStat bars animated\nPlayer profile visible]
+        L --> P[Archetype Locked overlay\nwith faction name, color accent, role]
+        M --> G
+    end
+```
+
+---
+
 ## What It Is
 
 An interactive single-page experience where users choose between four tennis player archetypes. Each archetype is a full-height vertical panel that expands on hover, revealing a cinematic player portrait, animated performance stats, and player profile.
