@@ -1,13 +1,915 @@
-/* Hero Faction Screen — styles
-   Design Intent will define all values here. */
-
+/* ==========================================
+   RESET
+========================================== */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
+/* ==========================================
+   TOKENS
+========================================== */
+:root {
+  --speed:      420ms;
+  --ease:       cubic-bezier(0.4, 0, 0.2, 1);
+  --font-head:  'Barlow Condensed', sans-serif;
+  --font-body:  'Barlow', sans-serif;
+  --bg:         #080808;
+  --text:       #ffffff;
+  --muted:      rgba(255, 255, 255, 0.28);
+  --header-h:   44px;
+  --footer-h:   44px;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+}
+
 body {
-  min-height: 100vh;
-  font-family: sans-serif;
+  color: var(--text);
+  font-family: var(--font-body);
+  cursor: crosshair;
+}
+
+/* ==========================================
+   INTRO KEYFRAMES
+   Total sequence: ~2.3s
+     0ms        screen/header fade in
+     100ms      panel 1 reveals
+     300ms      panel 2 reveals  (200ms stagger)
+     500ms      panel 3 reveals  (200ms stagger)
+     700ms      panel 4 reveals  (200ms stagger)
+     1350ms     shine sweep fires (130ms after panel 4 ends)
+========================================== */
+
+/* 1. Full screen rises from dark */
+@keyframes intro-screen {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* 2. Header / footer chrome */
+@keyframes intro-header {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes intro-footer {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 3. Panels: lift up + scale in + brighten — cinematic reveal */
+@keyframes intro-panel {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); filter: brightness(0.06); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    filter: brightness(1);   }
+}
+
+/* 4. Vertical labels: letter-spacing opens from compressed */
+@keyframes intro-label {
+  from { opacity: 0; letter-spacing: 0.08em; }
+  to   { opacity: 1; letter-spacing: 0.45em; }
+}
+
+/* 5. Final polish: thin diagonal shine sweeps left → right */
+@keyframes intro-shine {
+  0%   { transform: translateX(-120%); opacity: 0;    }
+  6%   { opacity: 1;                                  }
+  94%  { opacity: 0.55;                               }
+  100% { transform: translateX(500%);  opacity: 0;    }
+}
+
+/* 6. Numbers pulse once as interactivity cue after shine */
+@keyframes intro-pulse {
+  0%   { opacity: 0.35; }
+  45%  { opacity: 1;    }
+  100% { opacity: 0.6;  }
+}
+
+/* ==========================================
+   SCREEN WRAPPER
+========================================== */
+.screen {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: intro-screen 280ms ease-out both;
+}
+
+/* CRT scanlines — pure CSS texture */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.045) 3px,
+    rgba(0, 0, 0, 0.045) 4px
+  );
+  pointer-events: none;
+  z-index: 600;
+}
+
+/* ==========================================
+   HEADER
+========================================== */
+.header {
+  position: relative;
+  z-index: 100;
+  height: var(--header-h);
+  animation: intro-header 360ms ease-out 40ms both;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  align-items: center;
+  padding: 0 2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  font-family: var(--font-head);
+  font-size: 0.6rem;
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.header__center { text-align: center; }
+.header__right  { text-align: right; }
+
+/* ==========================================
+   GRID
+   CSS Grid with animated column distribution
+========================================== */
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  /* Animated — supported in all modern browsers */
+  transition: grid-template-columns var(--speed) var(--ease);
+  overflow: hidden;
+}
+
+/* When a faction is active, expand it to ~60%,
+   collapse the others to slivers (~13% each) */
+.grid[data-active="baseliner"] { grid-template-columns: 5fr 0.65fr 0.65fr 0.65fr; }
+.grid[data-active="aggressor"] { grid-template-columns: 0.65fr 5fr 0.65fr 0.65fr; }
+.grid[data-active="defender"]  { grid-template-columns: 0.65fr 0.65fr 5fr 0.65fr; }
+.grid[data-active="playmaker"] { grid-template-columns: 0.65fr 0.65fr 0.65fr 5fr; }
+
+/* ==========================================
+   INTRO SHINE SWEEP
+   Thin light pass fires after all 4 panels
+   are fully visible — the "activated" moment.
+   Panel 4 finishes at ~1220ms; shine at 1350ms.
+========================================== */
+.intro__sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 18%; /* narrow shine beam */
+  background: linear-gradient(
+    105deg,
+    transparent        0%,
+    transparent       30%,
+    rgba(255,255,255,0.025) 44%,
+    rgba(255,255,255,0.07)  50%,
+    rgba(255,255,255,0.025) 56%,
+    transparent       70%,
+    transparent      100%
+  );
+  pointer-events: none;
+  z-index: 50;
+  animation: intro-shine 900ms cubic-bezier(0.4, 0, 0.6, 1) 1350ms 1 both;
+}
+
+/* ==========================================
+   FACTION PANEL — base
+========================================== */
+.faction {
+  position: relative;
+  height: 100%;
+  background: var(--primary);
+  overflow: hidden;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  transition:
+    opacity var(--speed) var(--ease),
+    background var(--speed) var(--ease);
+}
+
+.faction:last-child { border-right: none; }
+
+/* Staggered panel reveal — left to right, 200ms between each.
+   nth-child starts at 2 because .intro__sweep is the first child of .grid */
+.faction:nth-child(2) { animation: intro-panel 520ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both; }
+.faction:nth-child(3) { animation: intro-panel 520ms cubic-bezier(0.22, 1, 0.36, 1) 300ms both; }
+.faction:nth-child(4) { animation: intro-panel 520ms cubic-bezier(0.22, 1, 0.36, 1) 500ms both; }
+.faction:nth-child(5) { animation: intro-panel 520ms cubic-bezier(0.22, 1, 0.36, 1) 700ms both; }
+
+/* Inactive: fade out non-hovered panels */
+.faction.is-inactive {
+  opacity: 0.32;
+}
+
+/* ==========================================
+   FACTION IMAGE
+   Hidden at rest. On hover: fades in (0 → 1)
+   and zooms in slightly (scale 1 → 1.05).
+   background-position uses --img-pos so each
+   faction can anchor the player differently.
+========================================== */
+.faction__image {
+  position: absolute;
+  inset: 0;
+  background-size: var(--img-size, cover);
+  background-position: var(--img-pos, center center);
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1.0);
+  will-change: opacity, transform, filter;
+  /* Desaturate + darken slightly in all states
+     so image never overpowers the UI */
+  filter: saturate(0.75) brightness(0.92);
+  transition:
+    opacity   var(--speed) var(--ease),
+    transform var(--speed) var(--ease),
+    filter    var(--speed) var(--ease);
+}
+
+/* Active: reveal image, zoom in, restore saturation slightly */
+.faction.is-active .faction__image {
+  opacity: 1;
+  transform: scale(1.05);
+  filter: saturate(0.88) brightness(1.02);
+}
+
+/* ==========================================
+   IMAGE OVERLAY
+   Three-layer gradient system:
+
+   1. Left → Right  — Protects text on the left.
+      Uses faction --primary so blend is seamless.
+      Right side opens up to reveal the player.
+
+   2. Bottom → Top  — Protects all text at bottom
+      (where name, desc, and CTA live).
+
+   3. Vignette      — Radial shadow on all edges
+      for a cinematic, contained feel.
+========================================== */
+.faction__overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    /* Vignette — cinematic edge darkening */
+    radial-gradient(
+      ellipse at center,
+      transparent 30%,
+      rgba(0, 0, 0, 0.52) 100%
+    ),
+    /* Left → Right — text protection */
+    linear-gradient(
+      to right,
+      var(--primary)          0%,
+      rgba(0, 0, 0, 0.75)   25%,
+      rgba(0, 0, 0, 0.28)   55%,
+      rgba(0, 0, 0, 0.05)  100%
+    ),
+    /* Bottom → Top — text + CTA protection */
+    linear-gradient(
+      to top,
+      var(--primary)          0%,
+      rgba(0, 0, 0, 0.65)   30%,
+      rgba(0, 0, 0, 0.18)   58%,
+      rgba(0, 0, 0, 0.04)  100%
+    );
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ==========================================
+   FACTION GLOW
+   Radial gradient from accent color.
+   Moves with mouse for a parallax depth effect.
+========================================== */
+.faction__glow {
+  position: absolute;
+  inset: -30%;
+  background: radial-gradient(
+    ellipse at 50% 85%,
+    var(--accent) 0%,
+    transparent 55%
+  );
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  z-index: 2;
+  transition:
+    opacity var(--speed) var(--ease),
+    transform 80ms linear;
+}
+
+.faction.is-active .faction__glow { opacity: 0.2; }
+
+/* ==========================================
+   FACTION HINT
+   Very faint bottom gradient in default state
+   so each panel has some color identity at rest.
+========================================== */
+.faction__hint {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 35%;
+  background: linear-gradient(to top, var(--accent), transparent);
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 2;
+  transition: opacity var(--speed) var(--ease);
+}
+
+.faction.is-active .faction__hint { opacity: 0; }
+
+/* ==========================================
+   TOP ACCENT LINE
+   Slides in from left when faction is active.
+========================================== */
+.faction__line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform var(--speed) var(--ease);
+  z-index: 10;
+}
+
+.faction.is-active .faction__line { transform: scaleX(1); }
+
+/* ==========================================
+   CORNER BRACKET (top-right)
+   Decorative UI detail, active state only.
+========================================== */
+.faction__bracket {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 18px;
+  height: 18px;
+  border-top: 1px solid var(--accent);
+  border-right: 1px solid var(--accent);
+  opacity: 0;
+  transition: opacity var(--speed) var(--ease);
+  z-index: 10;
+}
+
+.faction.is-active .faction__bracket { opacity: 0.5; }
+
+/* ==========================================
+   COLLAPSED LABEL
+   Shown when faction is NOT active.
+   Name displayed vertically (writing-mode).
+========================================== */
+.faction__label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+  opacity: 1;
+  transition: opacity 200ms var(--ease);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Hide label when this panel becomes active */
+.faction.is-active .faction__label {
+  opacity: 0;
+}
+
+.label__number {
+  font-family: var(--font-head);
+  font-size: 0.55rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  opacity: 0.6;
+  /* Same writing mode as name/subtitle — all three share one layout axis */
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.label__name {
+  font-family: var(--font-head);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  writing-mode: vertical-rl;
+  transform: rotate(180deg); /* bottom → top */
+}
+
+/* Labels letter-space open — 120ms after each panel starts */
+.faction:nth-child(2) .label__name { animation: intro-label 460ms ease-out 220ms both; }
+.faction:nth-child(3) .label__name { animation: intro-label 460ms ease-out 420ms both; }
+.faction:nth-child(4) .label__name { animation: intro-label 460ms ease-out 620ms both; }
+.faction:nth-child(5) .label__name { animation: intro-label 460ms ease-out 820ms both; }
+
+/* Numbers pulse once after shine settles — interactivity cue */
+.faction:nth-child(2) .label__number { animation: intro-pulse 700ms ease-in-out 2350ms 1 both; }
+.faction:nth-child(3) .label__number { animation: intro-pulse 700ms ease-in-out 2500ms 1 both; }
+.faction:nth-child(4) .label__number { animation: intro-pulse 700ms ease-in-out 2650ms 1 both; }
+.faction:nth-child(5) .label__number { animation: intro-pulse 700ms ease-in-out 2800ms 1 both; }
+
+/* Subtitle below vertical name in collapsed state */
+.label__subtitle {
+  font-family: var(--font-head);
+  font-size: 0.5rem;
+  font-weight: 300;
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  opacity: 0.5;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+/* ==========================================
+   EXPANDED CONTENT
+   Shown when faction IS active.
+   Anchored to bottom of panel.
+========================================== */
+.faction__content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2.5rem 3rem 3rem;
+  opacity: 0;
+  transform: translateY(14px);
+  pointer-events: none;
+  transition:
+    opacity var(--speed) var(--ease),
+    transform var(--speed) var(--ease);
+  z-index: 3;
+}
+
+.faction.is-active .faction__content {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: all;
+  transition-delay: 80ms; /* slight delay so grid finishes first */
+}
+
+/* Meta row: 01 — Role */
+.content__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.content__number {
+  font-family: var(--font-head);
+  font-size: 0.6rem;
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  color: var(--accent);
+}
+
+.content__divider {
+  color: rgba(255, 255, 255, 0.2);
+  font-weight: 300;
+}
+
+.content__role {
+  font-family: var(--font-head);
+  font-size: 0.6rem;
+  font-weight: 300;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Subtitle line between name and description */
+.content__subtitle {
+  font-family: var(--font-head);
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.8;
+  margin-bottom: 1rem;
+  margin-top: -1rem;
+}
+
+/* FACTION NAME — dominant typographic anchor */
+.content__name {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: clamp(5.5rem, 10.5vw, 13rem);
+  line-height: 0.85;
+  text-transform: uppercase;
+  letter-spacing: -0.025em;
+  color: #ffffff;
+  margin-bottom: 1.75rem;
+  will-change: transform;
+  transition: transform 80ms linear;
+  /* Subtle text shadow for depth */
+  text-shadow:
+    0 0 120px rgba(255, 255, 255, 0.04),
+    0 2px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* Player identity line */
+.content__player {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.85rem;
+}
+
+.player__name {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #ffffff;
+}
+
+.player__sep {
+  color: var(--accent);
+  opacity: 0.5;
+  font-size: 0.6rem;
+}
+
+.player__label {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.7rem;
+  color: var(--accent);
+  opacity: 0.75;
+}
+
+/* Description */
+.content__desc {
+  font-family: var(--font-body);
+  font-weight: 300;
+  font-size: clamp(0.65rem, 0.9vw, 0.82rem);
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.48);
+  max-width: 42ch;
+  margin-bottom: 0.85rem;
+}
+
+/* Achievements list */
+.content__achievements {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 1.4rem;
+}
+
+.content__achievements li {
+  font-family: var(--font-head);
+  font-size: 0.58rem;
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+  padding-left: 0.9rem;
+  position: relative;
+}
+
+.content__achievements li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 50%;
+  opacity: 0.7;
+}
+
+/* ==========================================
+   PERFORMANCE STATS
+   Always-visible in active state.
+   Bars animate 0 → value on hover via JS.
+========================================== */
+.content__stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 1.75rem;
+}
+
+/* Each row: LABEL ── [track/fill] ── 92% */
+.stat-row {
+  display: grid;
+  grid-template-columns: 6rem 1fr 2.8rem;
+  align-items: center;
+  gap: 0.85rem;
+  opacity: 0;
+  transform: translateY(5px);
+  transition:
+    opacity  280ms ease var(--delay, 0ms),
+    transform 280ms ease var(--delay, 0ms);
+}
+
+/* Rows fade in when their parent faction is active */
+.faction.is-active .stat-row {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Label: subtle, secondary hierarchy */
+.stat-row__label {
+  font-family: var(--font-head);
+  font-size: 0.52rem;
+  font-weight: 300;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.38);
+}
+
+/* Track: faint background rail */
+.stat-row__track {
+  position: relative;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+/* Fill: grows via JS, glows with accent color */
+.stat-row__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent), 0 0 2px var(--accent);
+  transition: width 720ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Value: slightly brighter to draw the eye */
+.stat-row__value {
+  font-family: var(--font-head);
+  font-size: 0.55rem;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  text-align: right;
+  min-width: 2.5rem;
+}
+
+/* Select button */
+.content__select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 2.5rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-family: var(--font-head);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  cursor: pointer;
+  align-self: flex-start;
+  transition:
+    background  220ms ease,
+    border-color 220ms ease,
+    color       220ms ease;
+}
+
+.content__select:hover {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--primary);
+}
+
+.select__arrow {
+  display: inline-block;
+  transition: transform 220ms ease;
+}
+
+.content__select:hover .select__arrow {
+  transform: translateX(5px);
+}
+
+/* ==========================================
+   FOOTER
+========================================== */
+.footer {
+  position: relative;
+  z-index: 100;
+  height: var(--footer-h);
+  animation: intro-footer 380ms ease-out 820ms both;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0 2rem;
+}
+
+.footer__quote {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-weight: 300;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.55);
+  text-align: center;
+}
+
+/* ==========================================
+   CONFIRM OVERLAY
+   Shown when user clicks SELECT FACTION.
+========================================== */
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(4, 4, 6, 0.94);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 400ms ease;
+}
+
+.confirm.is-visible {
+  opacity: 1;
+  pointer-events: all;
+  /* Subtle background pulse on open */
+  animation: confirm-bg 1.4s ease-out both;
+}
+
+@keyframes confirm-bg {
+  0%   { background: rgba(4, 4, 6, 0.75); }
+  35%  { background: rgba(4, 4, 6, 0.97); }
+  100% { background: rgba(4, 4, 6, 0.94); }
+}
+
+.confirm__inner {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ---- ENTRANCE ANIMATIONS ---- */
+
+/* Label fades up first */
+.confirm__inner.is-entering .confirm__label {
+  animation: fade-up 320ms ease-out 0ms both;
+}
+
+/* Title: scale + letter-spacing tighten */
+.confirm__inner.is-entering .confirm__name {
+  animation: title-lock 520ms cubic-bezier(0.16, 1, 0.3, 1) 60ms both;
+}
+
+@keyframes title-lock {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+    letter-spacing: 0.04em;
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    letter-spacing: -0.03em;
+  }
+}
+
+/* Light sweep across title text */
+.confirm__name {
+  position: relative;
+  overflow: hidden;
+}
+
+.confirm__name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent    38%,
+    rgba(255,255,255,0.09) 50%,
+    transparent    62%
+  );
+  transform: translateX(-150%);
+  pointer-events: none;
+}
+
+.confirm__inner.is-entering .confirm__name::after {
+  animation: light-sweep 950ms ease-out 420ms both;
+}
+
+@keyframes light-sweep {
+  from { transform: translateX(-150%); }
+  to   { transform: translateX(150%);  }
+}
+
+/* Accent line scales in from left */
+.confirm__inner.is-entering .confirm__line {
+  animation: line-in 380ms ease-out 280ms both;
+}
+
+@keyframes line-in {
+  from { transform: scaleX(0); opacity: 0; transform-origin: left; }
+  to   { transform: scaleX(1); opacity: 1; transform-origin: left; }
+}
+
+/* Role fades up */
+.confirm__inner.is-entering .confirm__role {
+  animation: fade-up 320ms ease-out 340ms both;
+}
+
+/* Button fades up last */
+.confirm__inner.is-entering .confirm__reset {
+  animation: fade-up 320ms ease-out 480ms both;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+.confirm__label {
+  font-family: var(--font-head);
+  font-size: 0.6rem;
+  font-weight: 300;
+  letter-spacing: 0.6em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.25);
+  margin-bottom: 1.25rem;
+}
+
+.confirm__name {
+  font-family: var(--font-head);
+  font-weight: 900;
+  font-size: clamp(5rem, 15vw, 14rem);
+  line-height: 0.85;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+.confirm__line {
+  width: 40px;
+  height: 2px;
+  margin-bottom: 1rem;
+}
+
+.confirm__role {
+  font-family: var(--font-head);
+  font-size: 0.75rem;
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 3.5rem;
+}
+
+.confirm__reset {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.35);
+  font-family: var(--font-head);
+  font-size: 0.65rem;
+  font-weight: 400;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  padding: 0.8rem 2rem;
+  cursor: pointer;
+  transition: border-color 200ms ease, color 200ms ease;
+}
+
+.confirm__reset:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: #fff;
 }
